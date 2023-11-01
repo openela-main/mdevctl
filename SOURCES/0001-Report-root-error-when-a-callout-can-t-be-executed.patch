@@ -1,0 +1,43 @@
+From ff69f6c64b14282172716d4e97b4b81da7606483 Mon Sep 17 00:00:00 2001
+From: Jonathon Jongsma <jjongsma@redhat.com>
+Date: Wed, 1 Dec 2021 16:37:36 -0600
+Subject: [PATCH 1/2] Report root error when a callout can't be executed
+
+We were ignoring the error result when a callout script failed to
+execute. In order to debug issues more easily, handle the error and
+print it to the debug output.
+
+Signed-off-by: Jonathon Jongsma <jjongsma@redhat.com>
+---
+ src/callouts.rs | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/callouts.rs b/src/callouts.rs
+index 1c92d85..17b733b 100644
+--- a/src/callouts.rs
++++ b/src/callouts.rs
+@@ -240,8 +240,8 @@ impl Callout {
+         for s in dir.as_ref().read_dir().ok()? {
+             let path = s.ok()?.path();
+ 
+-            match self.invoke_script(dev, &path, event, action).ok() {
+-                Some(res) => {
++            match self.invoke_script(dev, &path, event, action) {
++                Ok(res) => {
+                     if res.status.code().is_none() {
+                         warn!("callout script {:?} was terminated by a signal", path);
+                         continue;
+@@ -255,8 +255,8 @@ impl Callout {
+                         );
+                     }
+                 }
+-                _ => {
+-                    debug!("failed to execute callout script {:?}", path);
++                Err(e) => {
++                    debug!("failed to execute callout script {:?}: {:?}", path, e);
+                     continue;
+                 }
+             }
+-- 
+2.33.1
+
