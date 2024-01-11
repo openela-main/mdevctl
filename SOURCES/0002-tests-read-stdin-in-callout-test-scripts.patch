@@ -1,0 +1,57 @@
+From 70ba0298a49ccffc085da051ad553a1242f0bfe1 Mon Sep 17 00:00:00 2001
+From: Jonathon Jongsma <jjongsma@redhat.com>
+Date: Wed, 1 Dec 2021 16:39:06 -0600
+Subject: [PATCH 2/2] tests: read stdin in callout test scripts
+
+Callout scripts are intended to be passed a JSON device configuration
+string on stdin. For our simple callout tests, we used single-line
+test scripts that unconditionally returned a constant response code
+(either error or success). This sometimes causes the tests to fail due
+to the following error:
+
+    [2021-12-01T20:33:25Z DEBUG mdevctl::callouts] failed to execute callout script "/tmp/mdevctl-testZg8CPd/etc/mdevctl.d/scripts.d/callouts/rc1.sh": Failed to write to stdin of command
+
+        Caused by:
+            Broken pipe (os error 32)
+
+What seems to be happening is that mdevctl spawns the callout script and
+then attempts to write the JSON device configuration to its stdin pipe.
+However, the test scripts are so short that they may have exited before
+mdevctl can finish writing to stdin, which results in the command
+failing with a broken pipe error. In order to avoid this, make sure that
+the test scripts read from stdin before exiting.
+
+Signed-off-by: Jonathon Jongsma <jjongsma@redhat.com>
+---
+ tests/callouts/rc0.sh | 1 +
+ tests/callouts/rc1.sh | 1 +
+ tests/callouts/rc2.sh | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/tests/callouts/rc0.sh b/tests/callouts/rc0.sh
+index 039e4d0..669d0ec 100755
+--- a/tests/callouts/rc0.sh
++++ b/tests/callouts/rc0.sh
+@@ -1,2 +1,3 @@
+ #!/usr/bin/env bash
++json=$(</dev/stdin)
+ exit 0
+diff --git a/tests/callouts/rc1.sh b/tests/callouts/rc1.sh
+index ecdbef9..3863171 100755
+--- a/tests/callouts/rc1.sh
++++ b/tests/callouts/rc1.sh
+@@ -1,2 +1,3 @@
+ #!/usr/bin/env bash
++json=$(</dev/stdin)
+ exit 1
+diff --git a/tests/callouts/rc2.sh b/tests/callouts/rc2.sh
+index 5c66540..f2ec274 100755
+--- a/tests/callouts/rc2.sh
++++ b/tests/callouts/rc2.sh
+@@ -1,2 +1,3 @@
+ #!/usr/bin/env bash
++json=$(</dev/stdin)
+ exit 2
+-- 
+2.33.1
+
