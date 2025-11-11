@@ -1,26 +1,24 @@
-Name:		mdevctl
-Version:	1.1.0
-Release:	4%{?dist}
-Summary:	Mediated device management and persistence utility
+%bcond_without check
 
-Group:		System Environment/Kernel
-License:	LGPLv2
-URL:		https://github.com/mdevctl/mdevctl
+%global crate mdevctl
 
-Source0:	https://github.com/mdevctl/mdevctl/archive/%{version}/%{name}-%{version}.tar.gz
-Source1:	https://github.com/mdevctl/mdevctl/archive/%{version}/%{name}-%{version}-vendor.tar.gz
+Name:           mdevctl
+Version:        1.3.0
+Release:        1%{?dist}
+Summary:        A mediated device management utility for Linux
 
-ExclusiveArch:  %{rust_arches}
+License:        LGPL-2.1-only
+URL:            https://crates.io/crates/mdevctl
+Source:         %{crates_source}
+Source1:        https://github.com/mdevctl/mdevctl/releases/download/v%{version}/mdevctl-%{version}-vendor.tar.gz
 
-BuildRequires: bash
-BuildRequires: git
-BuildRequires: make
-BuildRequires: systemd
-BuildRequires: rust-toolset
+BuildRequires: make systemd python3-docutils
+%if 0%{?rhel}
+BuildRequires:  rust-toolset
+%else
+BuildRequires:  rust-packaging >= 21
+%endif
 Requires(post,postun): %{_sbindir}/udevadm
-
-Patch0: 0001-Report-root-error-when-a-callout-can-t-be-executed.patch
-Patch1: 0002-tests-read-stdin-in-callout-test-scripts.patch
 
 %description
 mdevctl is a utility for managing and persisting devices in the
@@ -30,34 +28,55 @@ can be dynamically created and potentially used by drivers like
 vfio-mdev for assignment to virtual machines.
 
 %prep
-%autosetup -S git_am -n %{name}-%{version}
-%cargo_prep -V 1
+%autosetup -n %{crate}-%{version_no_tilde} -p1 %{?rhel:-a1}
+%if 0%{?rhel}
+%cargo_prep -v vendor
+%else
+%cargo_prep
+
+%generate_buildrequires
+%cargo_generate_buildrequires
+%endif
 
 %build
 %cargo_build
+%cargo_license_summary
+%{cargo_license} > LICENSE.dependencies
+%if 0%{?rhel}
+%cargo_vendor_manifest
+%endif
 
 %install
 %make_install
 
+%if %{with check}
 %check
-export MDEVCTL_LOG=debug RUST_BACKTRACE=full
 %cargo_test
+%endif
 
 %files
 %license COPYING
+%license LICENSE.dependencies
+%if 0%{?rhel}
+%license cargo-vendor.txt
+%endif
 %doc README.md
 %{_sbindir}/mdevctl
 %{_sbindir}/lsmdev
 %{_udevrulesdir}/60-mdevctl.rules
 %dir %{_sysconfdir}/mdevctl.d
-%dir %{_sysconfdir}/mdevctl.d/scripts.d/callouts
-%dir %{_sysconfdir}/mdevctl.d/scripts.d/notifiers
+%dir %{_prefix}/lib/mdevctl/scripts.d/callouts
+%dir %{_prefix}/lib/mdevctl/scripts.d/notifiers
 %{_mandir}/man8/mdevctl.8*
 %{_mandir}/man8/lsmdev.8*
 %{_datadir}/bash-completion/completions/mdevctl
 %{_datadir}/bash-completion/completions/lsmdev
 
 %changelog
+* Thu Jun 05 2025 Miroslav Rezanina <mrezanin@redhat.com> - 1.3.0-1
+- Rebase to 1.3.0
+  Resolves: RHEL-73318
+
 * Thu Jan 20 2022 Jonathon Jongsma <jjongsma@redhat.com> - 1.1.0-4
 - fix gating.yaml indentation and rebuild
 
@@ -82,7 +101,6 @@ export MDEVCTL_LOG=debug RUST_BACKTRACE=full
 
 * Tue Jan 26 2021 Fedora Release Engineering <releng@fedoraproject.org> - 0.78-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
-
 
 * Tue Nov 24 2020 Alex Williamson <alex.williamson@redhat.com> - 0.78-1
 - e029640033d3 ("Automatic version commit for tag 0.78")
